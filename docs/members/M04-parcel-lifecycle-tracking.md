@@ -85,4 +85,10 @@ Use the error codes `INVALID_STATUS_TRANSITION` (409), `FAILURE_REASON_REQUIRED`
 
 ## Status / notes
 
-_Update as you go._
+- **Week 1-4 Core Complete**:
+  - `ParcelsService.create`: Unique tracking number (`SD#########`) with collision retry, fee estimation via `PricingService`, merchant idempotency on `(merchantId, merchantReference)`, outbox event `parcel.created` in one transaction.
+  - `ParcelsService.transition`: Complete state machine validation with `canTransition`, failure reason requirement for `FAILED` (422), proof check for `DELIVERED` (422), max delivery attempts limit (409), optimistic concurrency (`updateMany` count check → 409), history record and outbox event `parcel.status_changed` in one transaction. External `tx` supported for courier proof uploads.
+  - `ParcelsService.getPublicTracking`: Zero-PII projection (only tracking number, status, cities, timestamps, failure reason code).
+  - `TrackingStreamService` & `TrackingController`: SSE fan-out via RabbitMQ exclusive auto-delete queue (`api.sse.<uuid>`), in-memory filtering by tracking number, 404 validation for unknown tracking numbers, 25s ping heartbeats.
+  - Frontend (`apps/web`): Public tracking page with server-side snapshot fetch, `<TrackingView>`, `<TrackingTimeline>` visual stepper and activity log, `<TrackForm>`, and `useLiveTracking` hook with EventSource, exponential backoff, and 15s polling fallback.
+  - Tests: Full unit test suites (52 tests across service, stream, and controller) passing. Zero lint or typecheck errors.

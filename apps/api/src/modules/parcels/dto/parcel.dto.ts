@@ -66,7 +66,11 @@ export class ParcelDto {
 export class StatusHistoryItemDto {
   @ApiProperty({ enum: PARCEL_STATUSES }) status: ParcelStatus;
   @ApiProperty() at: Date;
-  @ApiPropertyOptional({ nullable: true, description: 'failure reason code only (public safe)' })
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description: 'failure reason code only (public safe)',
+  })
   reason: string | null;
 }
 
