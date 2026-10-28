@@ -10,7 +10,7 @@ import { GoogleButton } from './GoogleButton';
 /** Owner: M2. Email + password sign-in, plus a Google sign-in link. */
 export function LoginForm() {
   const router = useRouter();
-  const next = useSearchParams().get('next');
+  const next = safeNext(useSearchParams().get('next'));
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
 
@@ -48,4 +48,11 @@ export function LoginForm() {
       <GoogleButton label="Sign in with Google" />
     </form>
   );
+}
+
+/** Only same-site paths are allowed after login, so `?next=https://evil.example` can't redirect off-site. */
+function safeNext(next: string | null): string | null {
+  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')
+    ? next
+    : null;
 }

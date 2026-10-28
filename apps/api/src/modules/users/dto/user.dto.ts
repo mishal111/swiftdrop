@@ -45,6 +45,17 @@ export class AdminUpdateUserDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
+export class PageMetaDto {
+  @ApiProperty() page: number;
+  @ApiProperty() pageSize: number;
+  @ApiProperty() total: number;
+}
+
+export class PaginatedUsersDto {
+  @ApiProperty({ type: [UserDto] }) data: UserDto[];
+  @ApiProperty({ type: PageMetaDto }) meta: PageMetaDto;
+}
+
 export class ListUsersQuery extends PaginationQuery {
   @ApiPropertyOptional({ enum: ROLES }) @IsOptional() @IsIn(ROLES) role?: Role;
   @ApiPropertyOptional() @IsOptional() @IsString() search?: string;

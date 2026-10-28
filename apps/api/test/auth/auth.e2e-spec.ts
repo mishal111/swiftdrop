@@ -14,6 +14,23 @@ describe('auth module (integration)', () => {
     await t.close();
   });
 
+  /**
+   * The auth controller allows 10 requests a minute per route, counted per app instance. Blocks that
+   * log in a lot call this to run against their own app, so they don't fail depending on how many
+   * logins ran before them.
+   */
+  function useFreshApp() {
+    let shared: TestContext;
+    beforeAll(async () => {
+      shared = t;
+      t = await createTestApp();
+    });
+    afterAll(async () => {
+      await t.close();
+      t = shared;
+    });
+  }
+
   describe('POST /api/v1/auth/register', () => {
     it('registers a new customer, sets cookies, and allows access to /users/me', async () => {
       const email = `test-customer-${Date.now()}@swiftdrop.test`;
@@ -236,6 +253,21 @@ describe('auth module (integration)', () => {
     });
   });
 
+  describe('GET /api/v1/auth/google', () => {
+    it('redirects to Google when configured, or returns 501 when not', async () => {
+      const res = await request(t.http).get('/api/v1/auth/google');
+      if (res.status === 302) {
+        expect(res.headers.location).toContain('accounts.google.com/o/oauth2/v2/auth');
+        const cookies = res.headers['set-cookie'] as unknown as string[];
+        expect(cookies.some((c: string) => c.includes('sd_oauth_verifier'))).toBe(true);
+        expect(cookies.some((c: string) => c.includes('sd_oauth_state'))).toBe(true);
+      } else {
+        expect(res.status).toBe(501);
+        expect(res.body.error.code).toBe('NOT_IMPLEMENTED');
+      }
+    });
+  });
+
   describe('Admin staff management & authorization', () => {
     it('forbids non-admin users from accessing /admin/users (403 FORBIDDEN)', async () => {
       const customerCookie = await t.cookieFor('CUSTOMER');
@@ -286,10 +318,66 @@ describe('auth module (integration)', () => {
       });
       expect(auditLog).not.toBeNull();
       expect(auditLog?.actorRole).toBe('ADMIN');
+
+      // The new courier can sign in and lands on the courier portal.
+      const courierLoginRes = await request(t.http)
+        .post('/api/v1/auth/login')
+        .send({ email: courierEmail, password: 'Password123!' })
+        .expect(200);
+      expect(courierLoginRes.body.user.role).toBe('COURIER');
+      expect(courierLoginRes.body.home).toBe('/courier');
+    });
+
+    it('rejects a deactivated user’s existing access token and blocks new logins', async () => {
+      const adminCookie = await t.cookieFor('ADMIN');
+      const testEmail = `deactivate-guard-${Date.now()}@swiftdrop.test`;
+
+      const createRes = await request(t.http)
+        .post('/api/v1/admin/users')
+        .set('Cookie', adminCookie)
+        .send({
+          email: testEmail,
+          name: 'Deactivate Target',
+          role: 'COURIER',
+          password: 'Password123!',
+        })
+        .expect(201);
+
+      const loginRes = await request(t.http)
+        .post('/api/v1/auth/login')
+        .send({ email: testEmail, password: 'Password123!' })
+        .expect(200);
+      const loginCookies = loginRes.headers['set-cookie'] as unknown as string[];
+      const accessCookie = loginCookies.find((c: string) =>
+        c.startsWith(`${AUTH_COOKIES.ACCESS}=`),
+      )!;
+
+      // Warm the guard's status cache, so the test proves deactivation invalidates it.
+      await request(t.http).get('/api/v1/users/me').set('Cookie', accessCookie).expect(200);
+
+      await request(t.http)
+        .patch(`/api/v1/admin/users/${createRes.body.id}`)
+        .set('Cookie', adminCookie)
+        .send({ isActive: false })
+        .expect(200);
+
+      const meRes = await request(t.http)
+        .get('/api/v1/users/me')
+        .set('Cookie', accessCookie)
+        .expect(403);
+      expect(meRes.body.error.code).toBe('ACCOUNT_DISABLED');
+
+      const reLoginRes = await request(t.http)
+        .post('/api/v1/auth/login')
+        .send({ email: testEmail, password: 'Password123!' })
+        .expect(403);
+      expect(reLoginRes.body.error.code).toBe('ACCOUNT_DISABLED');
     });
   });
 
   describe('Hardening (review fixes)', () => {
+    useFreshApp();
+
     /** Creates an active CUSTOMER with a known password straight in the DB. */
     async function makeUser(prefix: string) {
       const email = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@swiftdrop.test`;
@@ -421,6 +509,23 @@ describe('auth module (integration)', () => {
         .set('Cookie', cookie)
         .send({ role: 'ADMIN' })
         .expect(400);
+    });
+  });
+
+  describe('Rate limiting', () => {
+    useFreshApp();
+
+    it('throttles login after 10 requests a minute (429 RATE_LIMITED)', async () => {
+      const attempt = () =>
+        request(t.http)
+          .post('/api/v1/auth/login')
+          .send({ email: 'rate-limit-test@swiftdrop.test', password: 'Password123!' });
+
+      for (let i = 0; i < 10; i++) expect((await attempt()).status).not.toBe(429);
+
+      const res = await attempt();
+      expect(res.status).toBe(429);
+      expect(res.body.error.code).toBe('RATE_LIMITED');
     });
   });
 });

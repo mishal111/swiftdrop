@@ -1,6 +1,7 @@
 # Authorization matrix
 
 Coordinated by M2. Every endpoint owner adds the negative tests listed here.
+Detailed cross-module security review and gap analysis: [`docs/security-review.md`](../security-review.md).
 
 | Role       | Allowed                                                                                   | Must NOT be able to                                                             | Negative test (owner)                         |
 | ---------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------- |

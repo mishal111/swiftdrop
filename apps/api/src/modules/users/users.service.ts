@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ERROR_CODES, type Role } from '@swiftdrop/contracts';
 import { Prisma, type User } from '@swiftdrop/db';
 import * as argon2 from 'argon2';
-import type { AuthUser } from '../../common/auth';
+import { JwtAuthGuard, type AuthUser } from '../../common/auth';
 import { AppError, notFound } from '../../common/errors/app-error';
 import { paginated } from '../../common/pagination/pagination';
 import { PrismaService } from '../../infra/prisma';
@@ -182,6 +182,9 @@ export class UsersService {
       );
       return u;
     });
+
+    // Make JwtAuthGuard re-read the new role/status on the user's next request.
+    JwtAuthGuard.invalidateUser(id);
 
     return this.toDto(updated);
   }
