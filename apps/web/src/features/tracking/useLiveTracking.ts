@@ -83,6 +83,8 @@ export function useLiveTracking({
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
+        // Catch up on anything that changed between the server render (or a reconnect) and now.
+        void fetchSnapshot();
       };
 
       es.addEventListener('status', (event: MessageEvent) => {
@@ -90,23 +92,11 @@ export function useLiveTracking({
         try {
           const payload = JSON.parse(event.data) as TrackingSseMessage;
           if (payload.trackingNumber === trackingNumber) {
+            // Show the new status at once, then reload the snapshot for the authoritative
+            // history (it carries the failure reason and avoids duplicate timeline entries).
             setStatus(payload.status);
             setUpdatedAt(payload.occurredAt);
-            setHistory((prev) => {
-              // Avoid duplicate timeline entries
-              const exists = prev.some(
-                (item) => item.status === payload.status && item.at === payload.occurredAt,
-              );
-              if (exists) return prev;
-              return [
-                ...prev,
-                {
-                  status: payload.status,
-                  at: payload.occurredAt,
-                  reason: null,
-                },
-              ];
-            });
+            void fetchSnapshot();
           }
         } catch {
           // Ignore invalid parse

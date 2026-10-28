@@ -235,10 +235,13 @@ export class ParcelsService {
       if (updateResult.count === 0) {
         throw new AppError(
           ERROR_CODES.CONFLICT,
-          `Concurrent update detected for parcel ${parcelId}`,
+          'The parcel was updated by someone else. Reload and try again.',
           HttpStatus.CONFLICT,
         );
       }
+
+      // A failure reason only belongs to a FAILED transition.
+      const failureReason = input.to === 'FAILED' ? (input.failureReason ?? null) : null;
 
       await tx.parcelStatusHistory.create({
         data: {
@@ -247,7 +250,7 @@ export class ParcelsService {
           toStatus: input.to,
           actorId: input.actor.id ?? null,
           actorRole: input.actor.role,
-          reason: input.failureReason ?? null,
+          reason: failureReason,
           note: input.note ?? null,
         },
       });
@@ -260,7 +263,7 @@ export class ParcelsService {
         previousStatus: parcel.status,
         newStatus: input.to,
         actorRole: input.actor.role,
-        failureReason: input.failureReason ?? null,
+        failureReason,
       });
 
       return tx.parcel.findUniqueOrThrow({ where: { id: parcelId } });

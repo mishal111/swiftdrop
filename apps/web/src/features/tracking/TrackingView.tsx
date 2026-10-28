@@ -40,20 +40,20 @@ export function TrackingView({
 
         <div className="flex items-center gap-2 text-xs text-muted">
           {connectionState === 'live' && (
-            <span className="inline-flex items-center gap-1.5 font-medium text-emerald-600">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            <span className="inline-flex items-center gap-1.5 font-medium text-success">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-success" />
               Live Updates Active
             </span>
           )}
           {connectionState === 'polling' && (
-            <span className="inline-flex items-center gap-1.5 text-amber-600">
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
+            <span className="inline-flex items-center gap-1.5 text-warning">
+              <span className="h-2 w-2 rounded-full bg-warning" />
               Auto-refreshing (Polling)
             </span>
           )}
           {connectionState === 'connecting' && (
             <span className="inline-flex items-center gap-1.5 text-muted">
-              <span className="h-2 w-2 animate-ping rounded-full bg-slate-400" />
+              <span className="h-2 w-2 animate-ping rounded-full bg-muted" />
               Connecting...
             </span>
           )}

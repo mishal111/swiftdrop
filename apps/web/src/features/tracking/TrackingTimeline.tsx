@@ -31,7 +31,10 @@ export function TrackingTimeline({
   );
 
   const isFailed = currentStatus === 'FAILED';
-  const currentIndex = ORDERED_STEPS.indexOf(currentStatus);
+  // A FAILED parcel keeps the progress it made: show the furthest step it reached before failing.
+  const currentIndex = isFailed
+    ? Math.max(0, ...history.map((h) => ORDERED_STEPS.indexOf(h.status)))
+    : ORDERED_STEPS.indexOf(currentStatus);
 
   return (
     <div className="space-y-6">
@@ -58,8 +61,8 @@ export function TrackingTimeline({
         <div className="relative flex items-center justify-between">
           <div className="absolute left-0 top-1/2 -z-0 h-0.5 w-full -translate-y-1/2 bg-line" />
           {ORDERED_STEPS.map((step, idx) => {
-            const isCompleted = !isFailed && (currentIndex >= idx || currentStatus === 'DELIVERED');
-            const isCurrent = currentStatus === step;
+            const isCompleted = currentIndex >= idx;
+            const isCurrent = !isFailed && currentStatus === step;
 
             return (
               <div key={step} className="relative z-10 flex flex-col items-center">
@@ -87,7 +90,7 @@ export function TrackingTimeline({
         </div>
 
         {isFailed && (
-          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div className="mt-4 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
             <span className="font-semibold">Delivery Exception: </span>
             {sortedHistory[0]?.reason ? (
               <span>Reason: {sortedHistory[0].reason.replace(/_/g, ' ')}</span>
@@ -125,7 +128,7 @@ export function TrackingTimeline({
                     <time className="text-xs text-muted">{dateStr}</time>
                   </div>
                   {item.reason && (
-                    <p className="mt-1 text-xs text-red-600 font-medium">
+                    <p className="mt-1 text-xs font-medium text-danger">
                       Reason: {item.reason.replace(/_/g, ' ')}
                     </p>
                   )}

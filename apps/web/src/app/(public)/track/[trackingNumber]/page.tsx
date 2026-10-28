@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { ParcelStatus } from '@swiftdrop/contracts';
-import { EmptyState, PageHeader } from '@/components/ui';
+import { Alert, EmptyState, PageHeader } from '@/components/ui';
 import { TrackForm, TrackingView } from '@/features/tracking';
+import { errorCode, errorMessage } from '@/lib/api/errors';
 import { serverApi } from '@/lib/api/server';
 
 export default async function TrackPage({
@@ -33,10 +34,16 @@ export default async function TrackPage({
 
         {error || !parcel ? (
           <div className="mt-8 space-y-6">
-            <EmptyState
-              title="Parcel Not Found"
-              description={`We couldn't locate any parcel with tracking number "${trackingNumber}". Please verify the number and try again.`}
-            />
+            {errorCode(error) === 'NOT_FOUND' ? (
+              <EmptyState
+                title="Parcel Not Found"
+                description={`We couldn't locate any parcel with tracking number "${trackingNumber}". Please verify the number and try again.`}
+              />
+            ) : (
+              <Alert tone="error">
+                {errorMessage(error, 'Tracking is unavailable right now. Please try again.')}
+              </Alert>
+            )}
             <div className="rounded-lg border border-line bg-surface p-6">
               <h3 className="mb-3 text-sm font-medium text-ink">Track Another Parcel</h3>
               <TrackForm />
@@ -52,7 +59,6 @@ export default async function TrackPage({
                 at: new Date(h.at).toISOString(),
                 reason: (h.reason as string | null) ?? null,
               }))}
-
               initialUpdatedAt={new Date(parcel.updatedAt).toISOString()}
               originCity={parcel.originCity}
               destinationCity={parcel.destinationCity}
