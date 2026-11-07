@@ -1,16 +1,52 @@
-import { NotImplemented, PageHeader } from '@/components/ui';
+import { PageHeader } from '@/components/ui';
+import { ReportsDashboard, type ReportData, type ReportZone } from '@/features/reports';
+import { errorMessage } from '@/lib/api/errors';
+import { serverApi } from '@/lib/api/server';
+import { requireRole } from '@/lib/auth/session';
 
 export const metadata = { title: 'Reports' };
 
-/**
- * Owner: M9. TODO(M9): GET /api/v1/admin/reports/* with date-range filters.
- * Put components in src/features/<your-feature>/ and keep this file thin.
- */
 export default async function AdminReportsPage() {
+  const user = await requireRole(['ADMIN', 'DISPATCHER']);
+  const api = await serverApi();
+  const [summary, dailyVolume, couriers, zones] = await Promise.all([
+    api.GET('/api/v1/admin/reports/deliveries'),
+    api.GET('/api/v1/admin/reports/daily-volume'),
+    api.GET('/api/v1/admin/reports/couriers'),
+    api.GET('/api/v1/admin/zones'),
+  ]);
+
+  const reportError = summary.error ?? dailyVolume.error ?? couriers.error;
+  const zoneResponse = zones as unknown as { data?: ReportZone[]; error?: unknown };
+  const zoneError = zoneResponse.error
+    ? errorMessage(zoneResponse.error, 'Could not load delivery zones')
+    : undefined;
+  const initialData: ReportData | null =
+    summary.data && dailyVolume.data && couriers.data
+      ? {
+          summary: summary.data,
+          dailyVolume: dailyVolume.data,
+          couriers: couriers.data,
+        }
+      : null;
+
   return (
-    <>
-      <PageHeader title={'Reports'} description="Volume, success rate and courier performance" />
-      <NotImplemented owner="M9" doc="docs/members/M09-reporting-audit.md" />
-    </>
+    <div className="space-y-6">
+      <PageHeader
+        title="Reports"
+        description={
+          user.role === 'ADMIN'
+            ? 'Operational delivery performance and courier insights'
+            : 'Operational delivery and courier workload insights'
+        }
+      />
+      <ReportsDashboard
+        role={user.role}
+        initialData={initialData}
+        initialError={reportError ? errorMessage(reportError, 'Could not load reports') : undefined}
+        zoneError={zoneError}
+        zones={zoneResponse.data ?? []}
+      />
+    </div>
   );
 }
